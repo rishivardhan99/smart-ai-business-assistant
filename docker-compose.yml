@@ -1,0 +1,63 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # 1. PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: smartai-db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: smartai
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # 2. Redis Cache
+  redis:
+    image: redis:alpine
+    container_name: smartai-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  # 3. FastAPI Backend
+  backend:
+    build: ./backend
+    container_name: smartai-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://admin:password123@db:5432/smartai
+      - REDIS_HOST=redis  # Docker auto-routes 'redis' to the container above!
+      - REDIS_PORT=6379
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY} # Pulls from a local .env file
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./backend/chroma_db:/app/chroma_db # Persist your vector data
+      - ./backend/uploads:/app/uploads     # Persist uploaded PDFs
+
+  # 4. React/Vite Frontend
+  frontend:
+    build: ./frontend
+    container_name: smartai-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000/api/v1
+    depends_on:
+      - backend
+    volumes:
+      # Optional: Maps your local code to the container for hot-reloading
+      - ./frontend/src:/app/src
+
+volumes:
+  pgdata:
+  redis_data:
