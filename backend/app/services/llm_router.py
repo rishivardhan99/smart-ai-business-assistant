@@ -16,7 +16,7 @@ class LLMRouter:
         if cls._primary_llm is None:
             cls._primary_llm = ChatGoogleGenerativeAI(
                 # Use the -latest tag or fallback to gemini-pro if this still gives a 404
-                model="gemini-1.5-flash-latest", 
+                model="gemini-2.5-flash-latest", 
                 temperature=0.2,
                 google_api_key=settings.GOOGLE_API_KEY 
             )

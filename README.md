@@ -25,6 +25,20 @@ A production-ready, highly modular AI business assistant designed for SMEs. Feat
 
 ## 🏗️ Architecture & Tech Stack
 
+The application is split into a separated Frontend and Backend, orchestrated via Docker. This ensures a strict boundary between public client interactions and secure administrative operations.
+
+### High-Level System Flow
+![Detailed Architecture](img/detailed_architecture.png)
+
+### Client vs. Admin Separation
+![Client vs Team Separation](img/clinet-team-seperation.png)
+
+### Backend
+- **Framework**: FastAPI (Python 3.12)
+- **AI/LLM orchestration**: LangGraph & LangChain
+... (keep the rest of your list)
+## 🏗️ Architecture & Tech Stack
+
 The application is split into a separated Frontend and Backend, orchestrated via Docker.
 
 ### Backend
