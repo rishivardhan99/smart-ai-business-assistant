@@ -8,6 +8,7 @@ import AdminLayout from './layouts/AdminLayout';
 import Documents from './pages/Documents';
 import Traces from './pages/Traces';
 import Automations from './pages/Automations';
+import Settings from './pages/Settings'
 // Simple protection wrapper
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('adminToken');
@@ -41,7 +42,7 @@ export default function App() {
           <Route path="documents" element={<Documents />} />
           <Route path="traces" element={<Traces />} />
           <Route path="automations" element={<Automations />} />
-          
+          <Route path="settings" element={<Settings />} />
           {/* Future routes: */}
           {/* <Route path="documents" element={<Documents />} /> */}
         </Route>

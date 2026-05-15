@@ -16,17 +16,7 @@ services:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
 
-  # 2. Redis Cache
-  redis:
-    image: redis:alpine
-    container_name: smartai-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
-
-  # 3. FastAPI Backend
+  # 2. FastAPI Backend
   backend:
     build: ./backend
     container_name: smartai-backend
@@ -34,17 +24,14 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://admin:password123@db:5432/smartai
-      - REDIS_HOST=redis  # Docker auto-routes 'redis' to the container above!
-      - REDIS_PORT=6379
       - GOOGLE_API_KEY=${GOOGLE_API_KEY} # Pulls from a local .env file
     depends_on:
       - db
-      - redis
     volumes:
       - ./backend/chroma_db:/app/chroma_db # Persist your vector data
       - ./backend/uploads:/app/uploads     # Persist uploaded PDFs
 
-  # 4. React/Vite Frontend
+  # 3. React/Vite Frontend
   frontend:
     build: ./frontend
     container_name: smartai-frontend
@@ -60,4 +47,3 @@ services:
 
 volumes:
   pgdata:
-  redis_data:

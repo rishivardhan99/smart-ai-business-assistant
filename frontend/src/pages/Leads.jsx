@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import { api } from '../api/apiConfig';
 import { 
   Search, 
-  Download, 
   Mail, 
   Building2, 
   Flame, 
@@ -13,20 +12,25 @@ import {
   X, 
   CheckCircle, 
   MessageSquare, 
-  ShieldAlert 
+  ShieldAlert,
+  Calendar,
+  Clock
 } from 'lucide-react';
 
 export default function Leads() {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDraft, setSelectedDraft] = useState(null); // State for the draft modal
+  
+  // Modal State
+  const [selectedDraft, setSelectedDraft] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editableDraft, setEditableDraft] = useState("");
 
-  // Moved outside useEffect so we can call it after a CRM sync!
   const fetchLeads = async () => {
     try {
       const response = await api.get('/leads/');
-      setLeads(response.data.leads || response.data); // handles both dict and array returns safely
+      setLeads(response.data.leads || response.data); 
     } catch (err) {
       console.error("Failed to load leads", err);
     } finally {
@@ -37,6 +41,23 @@ export default function Leads() {
   useEffect(() => {
     fetchLeads();
   }, []);
+
+  // --- Calendar Download Logic ---
+  const downloadCalendar = async (leadId, leadName) => {
+    try {
+      const response = await api.get(`/leads/${leadId}/calendar`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `meeting_${leadName || 'client'}.ics`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+    } catch (err) {
+      console.error("Failed to download calendar", err);
+      alert("Could not generate calendar invite.");
+    }
+  };
 
   const filteredLeads = leads.filter(lead => 
     lead.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -49,19 +70,21 @@ export default function Leads() {
       warm: "bg-orange-50 text-orange-700 border-orange-200",
       cold: "bg-blue-50 text-blue-700 border-blue-200",
       synced: "bg-green-50 text-green-700 border-green-200",
+      "awaiting review": "bg-yellow-50 text-yellow-700 border-yellow-200"
     };
     const icons = {
       hot: <Flame size={14} className="mr-1" />,
       warm: <Sun size={14} className="mr-1" />,
       cold: <Snowflake size={14} className="mr-1" />,
-      synced: <CheckCircle size={14} className="mr-1" />
+      synced: <CheckCircle size={14} className="mr-1" />,
+      "awaiting review": <Clock size={14} className="mr-1" />
     };
-    const safeStatus = status?.toLowerCase();
+    const safeStatus = status?.toLowerCase() || 'awaiting review';
     const style = styles[safeStatus] || "bg-gray-50 text-gray-700 border-gray-200";
     
     return (
       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${style}`}>
-        {icons[safeStatus]} {status?.toUpperCase() || 'NEW'}
+        {icons[safeStatus]} {status?.toUpperCase() || 'AWAITING REVIEW'}
       </span>
     );
   };
@@ -125,7 +148,6 @@ export default function Leads() {
                   <StatusBadge status={lead.status} />
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  {/* Enterprise Confidence Bar */}
                   <div className="flex items-center gap-2">
                     <div className="w-24 bg-gray-200 rounded-full h-2 overflow-hidden">
                       <div 
@@ -139,7 +161,11 @@ export default function Leads() {
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   {lead.follow_up_draft ? (
                     <button 
-                      onClick={() => setSelectedDraft(lead)}
+                      onClick={() => {
+                        setSelectedDraft(lead);
+                        setEditableDraft(lead.follow_up_draft || ""); // Load draft for editing
+                        setIsEditing(false); // Default to view mode
+                      }}
                       className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors border ${
                         lead.status === 'synced' 
                         ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
@@ -162,9 +188,9 @@ export default function Leads() {
       {/* AI Draft & Context Modal */}
       {selectedDraft && (
         <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full overflow-hidden border border-gray-200 flex flex-col max-h-[90vh]">
+          <div className="bg-white rounded-2xl shadow-xl max-w-5xl w-full overflow-hidden border border-gray-200 flex flex-col max-h-[90vh]">
             
-            {/* Header */}
+            {/* Modal Header */}
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50 shrink-0">
               <div>
                 <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -179,24 +205,23 @@ export default function Leads() {
               </div>
               <button onClick={() => {
                 setSelectedDraft(null);
-                fetchLeads(); // Refresh table when closing to show updated status
+                fetchLeads(); 
               }} className="text-gray-400 hover:text-gray-700 p-1 rounded-md hover:bg-gray-200 transition-colors">
                 <X size={20} />
               </button>
             </div>
 
-            {/* Content Area (Scrollable) */}
+            {/* Modal Body */}
             <div className="p-6 overflow-y-auto flex-1 bg-white">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 
-                {/* Left Column: The Conversation Context */}
+                {/* Left Column: Context */}
                 <div className="flex flex-col">
                   <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
                     <MessageSquare size={16} className="text-blue-500" />
                     Conversation Context
                   </h4>
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex-1 min-h-[300px] overflow-y-auto text-sm space-y-4 shadow-inner">
-                    {/* Simulated Context - In a real app, fetch messages via selectedDraft.conversation_id */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex-1 min-h-[350px] overflow-y-auto text-sm space-y-4 shadow-inner">
                     <div className="bg-white p-3 rounded-lg shadow-sm border border-slate-200">
                       <p className="font-semibold text-xs text-gray-500 mb-1 flex items-center gap-1">
                         <Building2 size={12} /> User ({selectedDraft.name})
@@ -218,42 +243,76 @@ export default function Leads() {
                   </div>
                 </div>
 
-                {/* Right Column: The AI Draft */}
+                {/* Right Column: AI Draft & Edit Toggle */}
                 <div className="flex flex-col">
-                  <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                    <FileText size={16} className="text-indigo-500" />
-                    Autonomous Follow-Up Draft
-                  </h4>
-                  <div className="bg-indigo-50/30 p-5 rounded-xl border border-indigo-100 flex-1 min-h-[300px] overflow-y-auto shadow-inner relative">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                      <FileText size={16} className="text-indigo-500" />
+                      Autonomous Follow-Up Draft
+                    </h4>
+                    
+                    {/* EDIT BUTTON */}
+                    {selectedDraft.status !== 'synced' && (
+                      <button 
+                        onClick={async () => {
+                          if (isEditing) {
+                            // Save the draft to the database
+                            try {
+                              await api.put(`/leads/${selectedDraft.id}/draft`, { draft: editableDraft });
+                              setSelectedDraft({...selectedDraft, follow_up_draft: editableDraft});
+                              fetchLeads(); // Refresh table behind modal
+                            } catch (err) {
+                              alert("Failed to save draft");
+                            }
+                          }
+                          setIsEditing(!isEditing);
+                        }}
+                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors border border-indigo-200"
+                      >
+                        {isEditing ? '💾 Save Changes' : '✏️ Edit Draft'}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="bg-indigo-50/30 p-5 rounded-xl border border-indigo-100 flex-1 min-h-[350px] overflow-y-auto shadow-inner relative flex flex-col">
                     {selectedDraft.status === 'synced' && (
-                      <div className="absolute top-4 right-4 rotate-12 opacity-20 pointer-events-none">
+                      <div className="absolute top-4 right-4 rotate-12 opacity-20 pointer-events-none z-0">
                         <span className="text-4xl font-black text-green-600 uppercase tracking-widest border-4 border-green-600 p-2 rounded-lg">SENT</span>
                       </div>
                     )}
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap font-mono leading-relaxed relative z-10">
-                      {selectedDraft.follow_up_draft || "No draft available."}
-                    </p>
+                    
+                    {/* TEXT AREA VS PARAGRAPH TOGGLE */}
+                    {isEditing ? (
+                      <textarea
+                        value={editableDraft}
+                        onChange={(e) => setEditableDraft(e.target.value)}
+                        className="w-full flex-1 min-h-[300px] p-3 text-sm text-gray-700 bg-white border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-mono relative z-10 resize-none shadow-sm"
+                        placeholder="Write your email draft here..."
+                      />
+                    ) : (
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap font-mono leading-relaxed relative z-10">
+                        {selectedDraft.follow_up_draft || "No draft available."}
+                      </p>
+                    )}
                   </div>
                 </div>
 
               </div>
             </div>
 
-            {/* Footer / Actions */}
+            {/* Modal Footer / Actions */}
             <div className="px-6 py-4 border-t border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">
               <span className="text-xs text-gray-500 flex items-center gap-1.5">
                 <ShieldAlert size={14} className="text-amber-500" /> 
                 Review AI drafts before pushing to the CRM pipeline.
               </span>
+              
               <div className="flex gap-3">
                 <button 
-                  onClick={() => {
-                    setSelectedDraft(null);
-                    fetchLeads();
-                  }} 
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 bg-gray-100 rounded-lg transition-colors border border-gray-200"
+                  onClick={() => downloadCalendar(selectedDraft.id, selectedDraft.name)}
+                  className="px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100 bg-indigo-50 rounded-lg transition-colors border border-indigo-200 flex items-center gap-2"
                 >
-                  Close
+                  <Calendar size={16} /> Download .ics
                 </button>
                 
                 <button 
@@ -265,12 +324,12 @@ export default function Leads() {
                     
                     try {
                       await api.post(`/leads/${selectedDraft.id}/sync`);
-                      btn.innerHTML = '<span class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> Synced to CRM</span>';
+                      btn.innerHTML = '<span class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> Synced to Google Sheets</span>';
                       btn.className = "px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg shadow-sm flex items-center justify-center min-w-[150px] transition-all cursor-not-allowed";
-                      setSelectedDraft({...selectedDraft, status: 'synced'}); // update local state immediately for UI
+                      setSelectedDraft({...selectedDraft, status: 'synced'}); 
                     } catch (err) {
                       console.error(err);
-                      btn.innerHTML = 'Sync Failed';
+                      btn.innerHTML = 'Sync Failed (See Console)';
                       btn.className = "px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg shadow-sm flex items-center justify-center min-w-[150px] transition-all";
                       setTimeout(() => {
                          btn.innerHTML = originalContent;
@@ -287,8 +346,8 @@ export default function Leads() {
                   }`}
                 >
                   {selectedDraft.status === 'synced' ? (
-                    <span className="flex items-center gap-2"><CheckCircle size={16} /> Synced to CRM</span>
-                  ) : 'Send to CRM'}
+                    <span className="flex items-center gap-2"><CheckCircle size={16} /> Synced</span>
+                  ) : 'Approve & Sync'}
                 </button>
               </div>
             </div>
