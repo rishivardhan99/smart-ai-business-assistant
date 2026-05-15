@@ -5,7 +5,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 
 def get_gemini_model(temperature: float = 0.7, max_tokens: int = 1000):
     return ChatGoogleGenerativeAI(
-        model="gemini-1.5-pro-latest",
+        model="gemini-2.5-pro-latest",
         temperature=temperature,
         max_output_tokens=max_tokens,
         google_api_key=os.getenv("GEMINI_API_KEY"),
